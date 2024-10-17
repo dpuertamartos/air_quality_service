@@ -4,8 +4,6 @@ import numpy as np
 import logging
 import json
 from threading import Lock
-import dask.array as da
-import zarr
 
 DATA_SET_LOCATION = './data/data.zarr'
 
@@ -167,20 +165,18 @@ def add_data():
             lat = data.get('lat')
             lon = data.get('lon')
             pm25 = data.get('pm25')
-            year = data.get('year', 2000)  # Default year if not provided
 
             if lat is None or lon is None or pm25 is None:
                 return jsonify({'error': 'lat, lon, and pm25 are required fields'}), 400
 
-            # Find the nearest indices for lat and lon 
+            # Validate that pm25 is a number
+            if not isinstance(pm25, (int, float)):
+                return jsonify({'error': 'pm25 must be a number'}), 400
+
             lat_idx = np.abs(ds['lat'].values - lat).argmin()
             lon_idx = np.abs(ds['lon'].values - lon).argmin()
-
-
             ds['GWRPM25'][lat_idx, lon_idx] = pm25
             ds['GWRPM25'].isel(lat=lat_idx, lon=lon_idx).load()
-
-            ds.to_zarr(DATA_SET_LOCATION, mode='w')
 
             updated_entry = get_data_entry(lat_idx * ds.sizes['lon'] + lon_idx)
             return jsonify(updated_entry), 201
@@ -188,6 +184,7 @@ def add_data():
         except Exception as e:
             logging.error(f"Error adding data: {e}", exc_info=True)
             return jsonify({'error': str(e)}), 500
+
 
 @app.route('/data/<int:id>', methods=['PUT'])
 def update_data(id):
@@ -212,7 +209,6 @@ def update_data(id):
 
             ds['GWRPM25'][lat_idx, lon_idx] = pm25
             ds['GWRPM25'].isel(lat=lat_idx, lon=lon_idx).load()
-            ds.to_zarr(DATA_SET_LOCATION, mode='w')
 
             updated_entry = get_data_entry(id)
             return jsonify(updated_entry)
@@ -237,13 +233,13 @@ def delete_data(id):
 
             ds['GWRPM25'][lat_idx, lon_idx] = np.nan
             ds['GWRPM25'].isel(lat=lat_idx, lon=lon_idx).load()
-            ds.to_zarr(DATA_SET_LOCATION, mode='w')
 
             return jsonify({'message': f'Data entry {id} deleted'}), 200
 
         except Exception as e:
             logging.error(f"Error deleting data: {e}", exc_info=True)
             return jsonify({'error': str(e)}), 500
+
 
 
 if __name__ == '__main__':
