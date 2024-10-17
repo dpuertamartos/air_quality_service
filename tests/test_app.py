@@ -1,9 +1,10 @@
 import pytest
-from app.main import app
+from app.routes import init_routes
 import xarray as xr
 import numpy as np
+from threading import Lock
+from flask import Flask
 
-# Mock dataset for testing
 @pytest.fixture
 def mock_dataset(monkeypatch):
     lat = np.array([10.0, 20.0, 30.0, 40.0, 50.0])
@@ -15,7 +16,7 @@ def mock_dataset(monkeypatch):
         [9.5, np.nan, 11.0, 12.0, 13.0],
         [8.5, 9.0, 10.0, 11.0, 12.0],
     ])
-    
+
     mock_ds = xr.Dataset(
         {
             'GWRPM25': (['lat', 'lon'], pm25_data)
@@ -26,14 +27,17 @@ def mock_dataset(monkeypatch):
         }
     )
 
-    # Monkeypatch the original dataset with this mock dataset
-    monkeypatch.setattr('app.main.ds', mock_ds)
-    
     return mock_ds
 
-# Flask test client
 @pytest.fixture
-def client():
+def client(mock_dataset):
+     # Create a new Flask app instance for each test and Lock for thread safety
+    app = Flask(__name__) 
+    data_lock = Lock()  # 
+
+    # Initialize the routes with the mock dataset
+    init_routes(app, mock_dataset, data_lock)
+    
     app.config['TESTING'] = True
     with app.test_client() as client:
         yield client
