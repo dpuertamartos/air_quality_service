@@ -39,7 +39,7 @@ api will be exposed in `http://127.0.0.1:5000` / `http://0.0.0.0:5000`
 2. `python -m venv .venv`
 3. `source .venv/bin/activate`
 4. Transform data to `.zarr` format by launching `python ./data_transformation/convert_to_zarr.py`
-5. `docker build -t air-quality -f Dockerfile` 
+5. `docker build -t air-quality -f Dockerfile .` 
 6. `docker run -p 5000:5000 air-quality`
 
 
