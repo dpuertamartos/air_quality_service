@@ -117,7 +117,6 @@ def init_routes(app, ds, data_lock):
                 if error:
                     return generate_response(error=error, status_code=400)
 
-                # Update the dataset
                 lat_idx = np.abs(ds['lat'].values - data['lat']).argmin()
                 lon_idx = np.abs(ds['lon'].values - data['lon']).argmin()
                 update_pm25_value(ds, lat_idx, lon_idx, data['pm25'])
@@ -161,11 +160,9 @@ def init_routes(app, ds, data_lock):
         """
         with data_lock:
             try:
-                # Validate the ID
                 if not is_valid_id(id, ds):
                     return generate_response(error='Invalid ID', status_code=404)
 
-                # Perform the delete operation
                 lat_idx, lon_idx = get_lat_lon_indices(id, ds)
                 update_pm25_value(ds, lat_idx, lon_idx, pm25=np.nan)
 
