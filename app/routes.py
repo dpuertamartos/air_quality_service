@@ -9,16 +9,23 @@ def init_routes(app, ds, data_lock):
     @app.before_request
     def log_request_info():
         """
-        Logs request information before processing the request.
+        Logs request information (including body) in a single line before processing the request.
         """
         try:
-            logging.info(f"{request.remote_addr} - {request.method} {request.url}")
+            # Base log message with request details
+            log_message = f"{request.remote_addr} - {request.method} {request.url}"
+
+            # If the request method involves a body, append it to the log
             if request.method in ['POST', 'PUT', 'PATCH']:
                 data = request.get_json(silent=True)
                 if data:
-                    logging.info(f"Body: {json.dumps(data, separators=(',', ':'))}")
+                    log_message += f" - Body: {json.dumps(data, separators=(',', ':'))}"
                 else:
-                    logging.info("No JSON body in the request.")
+                    log_message += " - No JSON body in the request."
+
+            # Log the combined message in one line
+            logging.info(log_message)
+
         except Exception as e:
             logging.error(f"Error logging request data: {e}", exc_info=True)
 
