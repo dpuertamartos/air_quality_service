@@ -1,5 +1,31 @@
 import logging
 import numpy as np
+import dask
+
+def calculate_pm25_statistics(ds):
+    """
+    Calculate PM2.5 statistics (count, mean, min, max) using Dask.
+    
+    Args:
+        ds: The dataset containing PM2.5 data.
+        
+    Returns:
+        A dictionary with the calculated statistics.
+    """
+    pm25_da = ds['GWRPM25']
+    count, mean_pm25, min_pm25, max_pm25 = dask.compute(
+        pm25_da.count(), 
+        pm25_da.mean(), 
+        pm25_da.min(), 
+        pm25_da.max()
+    )
+    
+    return {
+        'count': int(count),
+        'mean_pm25': float(mean_pm25),
+        'min_pm25': float(min_pm25),
+        'max_pm25': float(max_pm25)
+    }
 
 def get_lat_lon_indices(id, ds):
     """

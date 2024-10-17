@@ -1,14 +1,15 @@
 from flask import request
 from app.api_utils import generate_response, extract_and_validate_json
 from app.data_set_utils import ( 
-    get_data_entry, get_lat_lon_indices, get_pm25_at_lat_lon, 
+    calculate_pm25_statistics, get_data_entry, get_lat_lon_indices, get_pm25_at_lat_lon, 
     paginate_data, update_pm25_value, is_valid_id
 )
 import logging
 import numpy as np
 import json
+import dask
 
-def init_routes(app, ds, data_lock):
+def init_routes(app, ds, data_lock, celery):
 
     @app.before_request
     def log_request_info():
@@ -29,6 +30,52 @@ def init_routes(app, ds, data_lock):
         except Exception as e:
             logging.error(f"Error logging request data: {e}", exc_info=True)
 
+    @celery.task(bind=True)
+    def calculate_stats_task(self):
+        """
+        Background task to calculate statistics using Celery.
+        """
+        try:
+            return calculate_pm25_statistics(ds)
+        except Exception as e:
+            self.update_state(state='FAILURE', meta={'exc': str(e)})
+            raise
+
+    @app.route('/data/stats-async', methods=['GET'])
+    def get_stats_async():
+        """
+        Trigger the Celery task for calculating statistics asynchronously.
+        """
+        task = calculate_stats_task.apply_async()
+        return generate_response(data={'task_id': task.id}, status_code=202)
+
+    @app.route('/data/stats/<task_id>', methods=['GET'])
+    def get_stats_result(task_id):
+        """
+        Check the status of the Celery task and return the result when ready.
+        """
+        task = calculate_stats_task.AsyncResult(task_id)
+        if task.state == 'PENDING':
+            response = {'state': task.state, 'status': 'Statistics calculation is pending...'}
+        elif task.state == 'SUCCESS':
+            response = {'state': task.state, 'result': task.result}
+        else:
+            response = {'state': task.state, 'status': 'Statistics calculation failed.'}
+
+        return generate_response(data=response)
+
+    @app.route('/data/stats', methods=['GET'])
+    def get_stats():
+        """
+        Perform synchronous statistics calculation using Dask.
+        """
+        try:
+            result = calculate_pm25_statistics(ds)
+            return generate_response(data=result)
+        except Exception as e:
+            logging.error(f"Error calculating statistics: {e}", exc_info=True)
+            return generate_response(error=str(e), status_code=500)
+
     @app.route('/data', methods=['GET'])
     def get_all_data():
         """
@@ -42,7 +89,7 @@ def init_routes(app, ds, data_lock):
         except Exception as e:
             logging.error(f"Error retrieving all data: {e}")
             return generate_response(error=str(e), status_code=500)
-   
+
     @app.route('/data/<int:id>', methods=['GET'])
     def get_data_by_id(id):
         """
@@ -84,25 +131,6 @@ def init_routes(app, ds, data_lock):
             return generate_response(data=result)
         except Exception as e:
             logging.error(f"Error filtering data: {e}")
-            return generate_response(error=str(e), status_code=500)
-
-    @app.route('/data/stats', methods=['GET'])
-    def get_stats():
-        """
-        Returns basic statistics (count, mean, min, max) for PM2.5 data.
-        """
-        try:
-            pm25_da = ds['GWRPM25']
-
-            stats = {
-                'count': int(pm25_da.count().compute()),
-                'mean_pm25': float(pm25_da.mean().compute()),
-                'min_pm25': float(pm25_da.min().compute()),
-                'max_pm25': float(pm25_da.max().compute())
-            }
-            return generate_response(data=stats)
-        except Exception as e:
-            logging.error(f"Error calculating statistics: {e}")
             return generate_response(error=str(e), status_code=500)
 
     @app.route('/data', methods=['POST'])

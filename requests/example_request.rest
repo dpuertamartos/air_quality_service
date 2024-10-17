@@ -10,10 +10,6 @@ Content-Type: application/json
 GET http://127.0.0.1:5000/data/filter?year=2000&lat=30.0&long=-90.0
 Content-Type: application/json
 
-### Get Basic Statistics
-GET http://127.0.0.1:5000/data/stats
-Content-Type: application/json
-
 ### Add New Data Entry (POST request)
 POST http://127.0.0.1:5000/data
 Content-Type: application/json
@@ -36,3 +32,17 @@ Content-Type: application/json
 ### Delete Data Entry by ID
 DELETE http://127.0.0.1:5000/data/1
 Content-Type: application/json
+
+### Get Basic Statistics
+GET http://127.0.0.1:5000/data/stats
+Content-Type: application/json
+
+### Get Basic Statistics using async task
+GET http://127.0.0.1:5000/data/stats-async
+Content-Type: application/json
+
+### Get Task Result
+GET http://127.0.0.1:5000/data/stats/bb8ba16a-a2ae-4c9a-b3e9-6ea46b088fd4"
+Content-Type: application/json
+
+

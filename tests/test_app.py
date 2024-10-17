@@ -4,6 +4,7 @@ import xarray as xr
 import numpy as np
 from threading import Lock
 from flask import Flask
+from unittest.mock import Mock
 
 @pytest.fixture
 def mock_dataset(monkeypatch):
@@ -30,13 +31,14 @@ def mock_dataset(monkeypatch):
     return mock_ds
 
 @pytest.fixture
-def client(mock_dataset):
-     # Create a new Flask app instance for each test and Lock for thread safety
+def client(mock_dataset, mocker):
+    mock_celery = Mock()
+    
+    # Create a new Flask app instance for each test and Lock for thread safety
     app = Flask(__name__) 
     data_lock = Lock()  # 
 
-    # Initialize the routes with the mock dataset
-    init_routes(app, mock_dataset, data_lock)
+    init_routes(app, mock_dataset, data_lock, mock_celery)
     
     app.config['TESTING'] = True
     with app.test_client() as client:
