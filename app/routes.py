@@ -1,21 +1,23 @@
-from flask import jsonify, request
-from app.utils import get_data_entry, get_lat_lon_indices
+from flask import request
+from app.api_utils import generate_response, extract_and_validate_json
+from app.data_set_utils import ( 
+    get_data_entry, get_lat_lon_indices, get_pm25_at_lat_lon, 
+    paginate_data, update_pm25_value, is_valid_id
+)
 import logging
 import numpy as np
 import json
 
 def init_routes(app, ds, data_lock):
-    
+
     @app.before_request
     def log_request_info():
         """
         Logs request information (including body) in a single line before processing the request.
         """
         try:
-            # Base log message with request details
             log_message = f"{request.remote_addr} - {request.method} {request.url}"
 
-            # If the request method involves a body, append it to the log
             if request.method in ['POST', 'PUT', 'PATCH']:
                 data = request.get_json(silent=True)
                 if data:
@@ -23,26 +25,9 @@ def init_routes(app, ds, data_lock):
                 else:
                     log_message += " - No JSON body in the request."
 
-            # Log the combined message in one line
             logging.info(log_message)
-
         except Exception as e:
             logging.error(f"Error logging request data: {e}", exc_info=True)
-
-    @app.route('/data/<int:id>', methods=['GET'])
-    def get_data_by_id(id):
-        """
-        Retrieves data entry by ID.
-        """
-        try:
-            entry = get_data_entry(id, ds)
-            if entry is not None:
-                return jsonify(entry)
-            else:
-                return jsonify({'error': 'Data not found'}), 404
-        except Exception as e:
-            logging.error(f"Error retrieving data by ID: {e}")
-            return jsonify({'error': str(e)}), 500
 
     @app.route('/data', methods=['GET'])
     def get_all_data():
@@ -52,41 +37,43 @@ def init_routes(app, ds, data_lock):
         try:
             page = request.args.get('page', default=1, type=int)
             per_page = request.args.get('per_page', default=100, type=int)
-            start = (page - 1) * per_page
-            end = start + per_page
-
-            total_points = ds.sizes['lat'] * ds.sizes['lon']
-            if start >= total_points:
-                return jsonify([])
-
-            data = []
-            for idx in range(start, min(end, total_points)):
-                entry = get_data_entry(idx, ds)
-                if entry is not None:
-                    data.append(entry)
-            return jsonify(data)
+            data = paginate_data(ds, page, per_page)
+            return generate_response(data=data)
         except Exception as e:
             logging.error(f"Error retrieving all data: {e}")
-            return jsonify({'error': str(e)}), 500
+            return generate_response(error=str(e), status_code=500)
+   
+    @app.route('/data/<int:id>', methods=['GET'])
+    def get_data_by_id(id):
+        """
+        Retrieves data entry by ID.
+        """
+        try:
+            entry = get_data_entry(id, ds)
+            if entry is not None:
+                return generate_response(data=entry)
+            else:
+                return generate_response(error='Data not found', status_code=404)
+        except Exception as e:
+            logging.error(f"Error retrieving data by ID: {e}")
+            return generate_response(error=str(e), status_code=500)
 
     @app.route('/data/filter', methods=['GET'])
     def filter_data():
         """
-        Filters data based on latitude and longitude, and optionally year.
+        Filters data based on latitude and longitude.
         """
         try:
             lat = request.args.get('lat', type=float)
             lon = request.args.get('long', type=float)
 
             if lat is None or lon is None:
-                return jsonify({'error': 'Latitude and Longitude are required'}), 400
+                return generate_response(error='Latitude and Longitude are required', status_code=400)
 
-            # Retrieves closes point to the queryed lat, lon
             lat_idx = np.abs(ds['lat'].values - lat).argmin()
             lon_idx = np.abs(ds['lon'].values - lon).argmin()
 
-            pm25_value = ds['GWRPM25'].isel(lat=lat_idx, lon=lon_idx).values.item()
-            pm25_value = float(pm25_value) if not np.isnan(pm25_value) else None
+            pm25_value = get_pm25_at_lat_lon(ds, lat_idx, lon_idx)
 
             result = {
                 'lat': float(ds['lat'].isel(lat=lat_idx).values.item()),
@@ -94,10 +81,10 @@ def init_routes(app, ds, data_lock):
                 'pm25': pm25_value
             }
 
-            return jsonify(result)
+            return generate_response(data=result)
         except Exception as e:
             logging.error(f"Error filtering data: {e}")
-            return jsonify({'error': str(e)}), 500
+            return generate_response(error=str(e), status_code=500)
 
     @app.route('/data/stats', methods=['GET'])
     def get_stats():
@@ -107,21 +94,16 @@ def init_routes(app, ds, data_lock):
         try:
             pm25_da = ds['GWRPM25']
 
-            count = int(pm25_da.count().compute())
-            mean_pm25 = float(pm25_da.mean().compute())
-            min_pm25 = float(pm25_da.min().compute())
-            max_pm25 = float(pm25_da.max().compute())
-
             stats = {
-                'count': count,
-                'mean_pm25': mean_pm25,
-                'min_pm25': min_pm25,
-                'max_pm25': max_pm25
+                'count': int(pm25_da.count().compute()),
+                'mean_pm25': float(pm25_da.mean().compute()),
+                'min_pm25': float(pm25_da.min().compute()),
+                'max_pm25': float(pm25_da.max().compute())
             }
-            return jsonify(stats)
+            return generate_response(data=stats)
         except Exception as e:
             logging.error(f"Error calculating statistics: {e}")
-            return jsonify({'error': str(e)}), 500
+            return generate_response(error=str(e), status_code=500)
 
     @app.route('/data', methods=['POST'])
     def add_data():
@@ -130,31 +112,22 @@ def init_routes(app, ds, data_lock):
         """
         with data_lock:
             try:
-                data = request.get_json()
-                if not data:
-                    return jsonify({'error': 'No data provided'}), 400
+                data, error = extract_and_validate_json(request, ['lat', 'lon', 'pm25'], numeric_fields=['lat', 'lon', 'pm25'])
 
-                lat = data.get('lat')
-                lon = data.get('lon')
-                pm25 = data.get('pm25')
+                if error:
+                    return generate_response(error=error, status_code=400)
 
-                if lat is None or lon is None or pm25 is None:
-                    return jsonify({'error': 'lat, lon, and pm25 are required fields'}), 400
-
-                if not isinstance(pm25, (int, float)):
-                    return jsonify({'error': 'pm25 must be a number'}), 400
-
-                lat_idx = np.abs(ds['lat'].values - lat).argmin()
-                lon_idx = np.abs(ds['lon'].values - lon).argmin()
-                ds['GWRPM25'][lat_idx, lon_idx] = pm25
-                ds['GWRPM25'].isel(lat=lat_idx, lon=lon_idx).load()
+                # Update the dataset
+                lat_idx = np.abs(ds['lat'].values - data['lat']).argmin()
+                lon_idx = np.abs(ds['lon'].values - data['lon']).argmin()
+                update_pm25_value(ds, lat_idx, lon_idx, data['pm25'])
 
                 updated_entry = get_data_entry(lat_idx * ds.sizes['lon'] + lon_idx, ds)
-                return jsonify(updated_entry), 201
 
+                return generate_response(data=updated_entry, status_code=201)
             except Exception as e:
                 logging.error(f"Error adding data: {e}")
-                return jsonify({'error': str(e)}), 500
+                return generate_response(error=str(e), status_code=500)
 
     @app.route('/data/<int:id>', methods=['PUT'])
     def update_data(id):
@@ -163,29 +136,23 @@ def init_routes(app, ds, data_lock):
         """
         with data_lock:
             try:
-                data = request.get_json()
-                if not data:
-                    return jsonify({'error': 'No data provided'}), 400
+                if not is_valid_id(id, ds):
+                    return generate_response(error='Invalid ID', status_code=404)
 
-                total_points = ds.sizes['lat'] * ds.sizes['lon']
-                if id < 0 or id >= total_points:
-                    return jsonify({'error': 'Invalid ID'}), 404
+                data, error = extract_and_validate_json(request, ['pm25'], numeric_fields=['pm25'])
+
+                if error:
+                    return generate_response(error=error, status_code=400)
 
                 lat_idx, lon_idx = get_lat_lon_indices(id, ds)
-
-                pm25 = data.get('pm25')
-                if pm25 is None:
-                    return jsonify({'error': 'pm25 is required to update'}), 400
-
-                ds['GWRPM25'][lat_idx, lon_idx] = pm25
-                ds['GWRPM25'].isel(lat=lat_idx, lon=lon_idx).load()
+                update_pm25_value(ds, lat_idx, lon_idx, data['pm25'])
 
                 updated_entry = get_data_entry(id, ds)
-                return jsonify(updated_entry)
 
+                return generate_response(data=updated_entry)
             except Exception as e:
                 logging.error(f"Error updating data: {e}")
-                return jsonify({'error': str(e)}), 500
+                return generate_response(error=str(e), status_code=500)
 
     @app.route('/data/<int:id>', methods=['DELETE'])
     def delete_data(id):
@@ -194,17 +161,15 @@ def init_routes(app, ds, data_lock):
         """
         with data_lock:
             try:
-                total_points = ds.sizes['lat'] * ds.sizes['lon']
-                if id < 0 or id >= total_points:
-                    return jsonify({'error': 'Invalid ID'}), 404
+                # Validate the ID
+                if not is_valid_id(id, ds):
+                    return generate_response(error='Invalid ID', status_code=404)
 
+                # Perform the delete operation
                 lat_idx, lon_idx = get_lat_lon_indices(id, ds)
+                update_pm25_value(ds, lat_idx, lon_idx, pm25=np.nan)
 
-                ds['GWRPM25'][lat_idx, lon_idx] = np.nan
-                ds['GWRPM25'].isel(lat=lat_idx, lon=lon_idx).load()
-
-                return jsonify({'message': f'Data entry {id} deleted'}), 200
-
+                return generate_response(data={'message': f'Data entry {id} deleted'}, status_code=200)
             except Exception as e:
                 logging.error(f"Error deleting data: {e}")
-                return jsonify({'error': str(e)}), 500
+                return generate_response(error=str(e), status_code=500)
