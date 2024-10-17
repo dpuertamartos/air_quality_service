@@ -1,6 +1,5 @@
 #!/bin/bash
 
-
 app_name="air-quality-microservice"
 username="dpuertamartos"
 tag="latest"
