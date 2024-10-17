@@ -1,11 +1,9 @@
 import xarray as xr
 import logging
 
-DATA_SET_LOCATION = './data/data.zarr'
-
-def load_dataset():
+def load_dataset(data_set_location):
     try:
-        ds = xr.open_zarr(DATA_SET_LOCATION, chunks={'lat': 100, 'lon': 100})
+        ds = xr.open_zarr(data_set_location, chunks={'lat': 100, 'lon': 100})
         if ds is None:
             raise ValueError("Failed to load dataset.")
         return ds
