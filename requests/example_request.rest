@@ -1,0 +1,38 @@
+### Get Data by ID
+GET http://127.0.0.1:5000/data/1
+Content-Type: application/json
+
+### Get All Data with Pagination (default page 1, 100 results per page)
+GET http://127.0.0.1:5000/data?page=1&per_page=100
+Content-Type: application/json
+
+### Filter Data by Year, Latitude, and Longitude
+GET http://127.0.0.1:5000/data/filter?year=2000&lat=30.0&long=-90.0
+Content-Type: application/json
+
+### Get Basic Statistics
+GET http://127.0.0.1:5000/data/stats
+Content-Type: application/json
+
+### Add New Data Entry (POST request)
+POST http://127.0.0.1:5000/data
+Content-Type: application/json
+
+{
+    "lat": 30.0,
+    "lon": -90.0,
+    "pm25": 12.5,
+    "year": 2000
+}
+
+### Update Data Entry by ID (PUT request)
+PUT http://127.0.0.1:5000/data/1
+Content-Type: application/json
+
+{
+    "pm25": 15.0
+}
+
+### Delete Data Entry by ID
+DELETE http://127.0.0.1:5000/data/1
+Content-Type: application/json

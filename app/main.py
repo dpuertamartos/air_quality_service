@@ -7,6 +7,8 @@ from threading import Lock
 import dask.array as da
 import zarr
 
+DATA_SET_LOCATION = './data/data.zarr'
+
 app = Flask(__name__)
 
 
@@ -15,7 +17,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 data_lock = Lock()
 
 try:
-    ds = xr.open_zarr('./data/data.zarr', chunks={'lat': 100, 'lon': 100})
+    ds = xr.open_zarr(DATA_SET_LOCATION, chunks={'lat': 100, 'lon': 100})
     if ds is None:
         raise ValueError("Failed to load dataset.")
 except Exception as e:
@@ -178,7 +180,7 @@ def add_data():
             ds['GWRPM25'][lat_idx, lon_idx] = pm25
             ds['GWRPM25'].isel(lat=lat_idx, lon=lon_idx).load()
 
-            ds.to_zarr('data.zarr', mode='w')
+            ds.to_zarr(DATA_SET_LOCATION, mode='w')
 
             updated_entry = get_data_entry(lat_idx * ds.sizes['lon'] + lon_idx)
             return jsonify(updated_entry), 201
@@ -210,7 +212,7 @@ def update_data(id):
 
             ds['GWRPM25'][lat_idx, lon_idx] = pm25
             ds['GWRPM25'].isel(lat=lat_idx, lon=lon_idx).load()
-            ds.to_zarr('data.zarr', mode='w')
+            ds.to_zarr(DATA_SET_LOCATION, mode='w')
 
             updated_entry = get_data_entry(id)
             return jsonify(updated_entry)
@@ -235,7 +237,7 @@ def delete_data(id):
 
             ds['GWRPM25'][lat_idx, lon_idx] = np.nan
             ds['GWRPM25'].isel(lat=lat_idx, lon=lon_idx).load()
-            ds.to_zarr('data.zarr', mode='w')
+            ds.to_zarr(DATA_SET_LOCATION, mode='w')
 
             return jsonify({'message': f'Data entry {id} deleted'}), 200
 
