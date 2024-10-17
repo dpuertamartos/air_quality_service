@@ -23,3 +23,4 @@ if __name__ == '__main__':
     log.disabled = True
     app.logger.disabled = False  # Keep the main logger enabled
     app.run(host='0.0.0.0', port=port)
+    logging.info("#########-------- AIR QUALITY SERVICE launched --------#########")
