@@ -1,0 +1,6 @@
+Dockerfile
+venv
+.gitignore
+.dockerignore
+.env
+README.md
