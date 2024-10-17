@@ -1,5 +1,5 @@
 from flask import jsonify, request
-from app.utils import get_data_entry
+from app.utils import get_data_entry, get_lat_lon_indices
 import logging
 import numpy as np
 import json
@@ -81,6 +81,7 @@ def init_routes(app, ds, data_lock):
             if lat is None or lon is None:
                 return jsonify({'error': 'Latitude and Longitude are required'}), 400
 
+            # Retrieves closes point to the queryed lat, lon
             lat_idx = np.abs(ds['lat'].values - lat).argmin()
             lon_idx = np.abs(ds['lon'].values - lon).argmin()
 
@@ -170,10 +171,7 @@ def init_routes(app, ds, data_lock):
                 if id < 0 or id >= total_points:
                     return jsonify({'error': 'Invalid ID'}), 404
 
-                lat_size = ds.sizes['lat']
-                lon_size = ds.sizes['lon']
-                lat_idx = id // lon_size
-                lon_idx = id % lon_size
+                lat_idx, lon_idx = get_lat_lon_indices(id, ds)
 
                 pm25 = data.get('pm25')
                 if pm25 is None:
@@ -200,10 +198,7 @@ def init_routes(app, ds, data_lock):
                 if id < 0 or id >= total_points:
                     return jsonify({'error': 'Invalid ID'}), 404
 
-                lat_size = ds.sizes['lat']
-                lon_size = ds.sizes['lon']
-                lat_idx = id // lon_size
-                lon_idx = id % lon_size
+                lat_idx, lon_idx = get_lat_lon_indices(id, ds)
 
                 ds['GWRPM25'][lat_idx, lon_idx] = np.nan
                 ds['GWRPM25'].isel(lat=lat_idx, lon=lon_idx).load()

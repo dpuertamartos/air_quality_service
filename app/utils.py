@@ -1,16 +1,30 @@
 import logging
 import numpy as np
 
+def get_lat_lon_indices(id, ds):
+    """
+    Given an ID and dataset, calculate the corresponding latitude and longitude indices.
+    
+    Args:
+        id (int): The ID representing the 1D index.
+        ds (xarray.Dataset): The dataset containing latitude and longitude sizes.
+
+    Returns:
+        tuple: (lat_idx, lon_idx) representing the indices in the dataset.
+    """
+    lon_size = ds.sizes['lon']
+    lat_idx = id // lon_size
+    lon_idx = id % lon_size
+    return lat_idx, lon_idx
+
+
 def get_data_entry(index, ds):
     try:
         total_points = ds.sizes['lat'] * ds.sizes['lon']
         if index < 0 or index >= total_points:
             return None
 
-        lat_size = ds.sizes['lat']
-        lon_size = ds.sizes['lon']
-        lat_idx = index // lon_size
-        lon_idx = index % lon_size
+        lat_idx, lon_idx = get_lat_lon_indices(index, ds)
 
         lat_value = ds['lat'].isel(lat=lat_idx).values.item()
         lon_value = ds['lon'].isel(lon=lon_idx).values.item()
