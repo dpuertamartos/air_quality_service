@@ -9,4 +9,4 @@ COPY ./requirements.txt .
 RUN pip install --no-cache-dir -r ./requirements.txt
 
 EXPOSE 5000
-CMD ["gunicorn", "-c", "app/config.py", "app.main:app"]
+CMD ["gunicorn", "-c", "app/config/main.py", "app.main:app"]

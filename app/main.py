@@ -1,10 +1,10 @@
 from flask import Flask
-from app.data_loader import load_dataset
-from app.routes import init_routes
-from app.config import data_set_location, port
+from app.utils.data_loader import load_dataset
+from app.routes.main import init_routes
+from app.config.main import data_set_location, port
 import logging
 from threading import Lock
-from app.celery_config import make_celery
+from app.config.celery_config import make_celery
 
 app = Flask(__name__)
 app.config.update(

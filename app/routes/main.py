@@ -1,6 +1,6 @@
 from flask import request
-from app.api_utils import generate_response, extract_and_validate_json
-from app.data_set_utils import ( 
+from app.utils.api_utils import generate_response, extract_and_validate_json
+from app.utils.data_set_utils import ( 
     calculate_pm25_statistics, get_data_entry, get_lat_lon_indices, get_pm25_at_lat_lon, 
     paginate_data, update_pm25_value, is_valid_id
 )

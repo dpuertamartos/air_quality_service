@@ -1,5 +1,5 @@
 import pytest
-from app.routes import init_routes
+from app.routes.main import init_routes
 import xarray as xr
 import numpy as np
 from threading import Lock

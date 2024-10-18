@@ -6,13 +6,17 @@ Containerized flask api that serves air quality data
 
 Creation of virtual environment (change for windows)
 
-`python -m venv .venv`
-`pip install -r requirements.txt`
-`source ./.venv/bin/activate`
+0. Install python 3.11
+
+1. `python -m venv .venv`
+
+2. `pip install -r requirements.txt`
+
+3. `source .venv/bin/activate`
 
 Simplely run in root folder
 
-`pytest`
+4. `pytest`
 
 # How to launch app
 
@@ -26,7 +30,8 @@ api will be exposed in `http://127.0.0.1:5000` / `http://0.0.0.0:5000`
 
 ## OPTION 2: Run locally
 
-1. Clone repo
+0. Install python 3.11
+1. `git clone <repository-url>`
 2. `python -m venv .venv`
 3. `source .venv/bin/activate`
 4. Transform data to `.zarr` format by launching `python ./data_transformation/convert_to_zarr.py`
