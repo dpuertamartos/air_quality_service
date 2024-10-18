@@ -7,7 +7,6 @@ from app.utils.data_set_utils import (
 import logging
 import numpy as np
 import json
-import dask
 
 def init_routes(app, ds, data_lock, celery):
 
